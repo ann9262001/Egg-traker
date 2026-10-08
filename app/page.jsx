@@ -125,8 +125,25 @@ const firebaseConfig = {
   appId: "1:1049461627091:web:7ccd56fde75ffc10ec1c26"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const appId = 'egg-tracker-team';
+  // ─── 安全初始化（防止重複初始化崩潰） ─── 
+let firebaseApp; 
+let firestoreDb;
+let firebaseAuth; 
+
+  if (typeof window !== 'undefined') { // 確保只在瀏覽器端執行 
+  try { 
+  const apps = getApps(); 
+  if (!apps.length) { 
+ firebaseApp = initializeApp(firebaseConfig); 
+ } else {
+ firebaseApp = getApp(); 
+ } firestoreDb = getFirestore(firebaseApp);
+ firebaseAuth = getAuth(firebaseApp); 
+ } catch (error) { 
+  console.error("Firebase 初始化失敗:", error);
+ }
+ }
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('checkin');

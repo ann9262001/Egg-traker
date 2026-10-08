@@ -26,11 +26,10 @@ import {
   ArrowRightLeft
 } from 'lucide-react';
 
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app'; // 補上 getApps, getApp
 import { 
   getAuth, 
-  signInAnonymously, 
-  signInWithCustomToken 
+  signInAnonymously
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -126,28 +125,43 @@ const firebaseConfig = {
 };
 
 const appId = 'egg-tracker-team';
-  // ─── 安全初始化（防止重複初始化崩潰） ─── 
+
+// ─── 每天打開自動預設台灣時間當天日期 ───
+const getTodayString = () => {
+  const now = new Date();
+  const tzOffset = 8 * 60; // 台灣是 UTC+8
+  const localTime = new Date(now.getTime() + (now.getTimezoneOffset() + tzOffset) * 60000);
+  const year = localTime.getFullYear();
+  const month = String(localTime.getMonth() + 1).padStart(2, '0');
+  const day = String(localTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+// ─── 安全初始化（防止重複初始化崩潰） ─── 
 let firebaseApp; 
 let firestoreDb;
 let firebaseAuth; 
 
-  if (typeof window !== 'undefined') { // 確保只在瀏覽器端執行 
+if (typeof window !== 'undefined') { // 確保只在瀏覽器端執行 
   try { 
-  const apps = getApps(); 
-  if (!apps.length) { 
- firebaseApp = initializeApp(firebaseConfig); 
- } else {
- firebaseApp = getApp(); 
- } firestoreDb = getFirestore(firebaseApp);
- firebaseAuth = getAuth(firebaseApp); 
- } catch (error) { 
-  console.error("Firebase 初始化失敗:", error);
- }
- }
+    const apps = getApps(); 
+    if (!apps.length) { 
+      firebaseApp = initializeApp(firebaseConfig); 
+    } else {
+      firebaseApp = getApp(); 
+    } 
+    firestoreDb = getFirestore(firebaseApp);
+    firebaseAuth = getAuth(firebaseApp); 
+  } catch (error) { 
+    console.error("Firebase 初始化失敗:", error);
+  }
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('checkin');
-  const [selectedDate, setSelectedDate] = useState('2026-10-07');
+  
+  // 已經在最外層定義 getTodayString，此處直接安全呼叫，一開啟就是當天！
+  const [selectedDate, setSelectedDate] = useState(getTodayString());
   
   // Real-time collaborative states
   const [purchases, setPurchases] = useState(INITIAL_PURCHASES);
@@ -197,12 +211,7 @@ export default function App() {
 
     const authenticateAndListen = async () => {
       try {
-        let userCredential;
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          userCredential = await signInWithCustomToken(firebaseAuth, __initial_auth_token);
-        } else {
-          userCredential = await signInAnonymously(firebaseAuth);
-        }
+        let userCredential = await signInAnonymously(firebaseAuth);
         
         const user = userCredential.user;
         setCurrentUser(user);
@@ -738,7 +747,7 @@ export default function App() {
   const todayOther = getTodayOtherRecord();
 
   return (
-    <div className="min-h-screen bg-amber-50/50 text-stone-800 pb-20 font-sans antialiased">
+    <div className="min-h-screen bg-amber-50/50 text-stone-800 pb-20 font-sans antialiased animate-fadeIn">
       {/* Toast 提示 */}
       {feedbackToast && (
         <div className="fixed top-14 left-1/2 -translate-x-1/2 z-50 bg-stone-900/90 text-white text-xs px-4 py-2 rounded-2xl shadow-lg backdrop-blur animate-fadeIn">
@@ -874,7 +883,7 @@ export default function App() {
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-amber-50 border border-amber-200 text-stone-800 text-sm font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  className="bg-amber-50 border border-amber-200 text-stone-800 text-sm font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-amber-400 animate-fadeIn"
                 />
               </div>
 
@@ -1164,7 +1173,7 @@ export default function App() {
                 return (
                   <div
                     key={p.id}
-                    className="bg-white p-3.5 rounded-2xl border border-stone-200/80 shadow-sm flex items-center justify-between gap-2"
+                    className="bg-white p-3.5 rounded-2xl border border-stone-200/80 shadow-sm flex items-center justify-between gap-2 animate-fadeIn"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm shrink-0">
@@ -1193,6 +1202,7 @@ export default function App() {
                         <Edit3 className="w-4 h-4" />
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDeletePurchase(p.id)}
                         className="p-2 text-stone-400 hover:text-red-500 transition rounded-xl hover:bg-red-50"
                         title="刪除紀錄"
@@ -1311,7 +1321,7 @@ export default function App() {
                   🎉 目前所有帳目完美平衡，無需進行任何轉帳！
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 animate-fadeIn">
                   {calculations.transactions.map((t, idx) => (
                     <div
                       key={idx}
@@ -1469,7 +1479,7 @@ export default function App() {
               <p>• 週期：{cycleStartDate} ~ {selectedDate}</p>
               <p>• 總支出：NT$ {calculations.totalSpent} (4人共吃 {calculations.totalEggsConsumed} 顆)</p>
               <p>• 剩餘存量：<strong className="text-emerald-700">{calculations.remainingEggs} 顆</strong> (會自動移交給下一期作為初始存量)</p>
-              <p className="text-[11px] text-amber-800 pt-1 border-t border-amber-200/60">
+              <p className="text-[11px] text-amber-800 pt-1 border-t border-amber-200/60 font-bold">
                 ✨ 結清後，所有人的應付帳目將會歸零，可以開始記錄新的採買與吃蛋！
               </p>
             </div>
@@ -1497,7 +1507,7 @@ export default function App() {
       {/* ================= 歷史結算紀錄彈窗 ================= */}
       {showHistoryModal && (
         <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full max-h-[85vh] flex flex-col p-5 shadow-2xl border border-stone-200 animate-fadeIn">
+          <div className="bg-white rounded-3xl max-md w-full max-h-[85vh] flex flex-col p-5 shadow-2xl border border-stone-200 animate-fadeIn">
             <div className="flex items-center justify-between pb-3 border-b border-stone-100">
               <div className="flex items-center gap-2">
                 <History className="w-5 h-5 text-amber-600" />
@@ -1513,7 +1523,7 @@ export default function App() {
 
             <div className="overflow-y-auto py-3 space-y-3 flex-1 pr-1">
               {settledHistory.length === 0 ? (
-                <p className="text-center text-xs text-stone-400 py-6">尚無任何歷史結清紀錄</p>
+                <p className="text-center text-xs text-stone-400 py-6 animate-fadeIn">尚無任何歷史結清紀錄</p>
               ) : (
                 settledHistory.map((hist, idx) => {
                   const isExp = expandedHistoryId === hist.id;
@@ -1538,14 +1548,14 @@ export default function App() {
                       </div>
 
                       {isExp && (
-                        <div className="pt-2 border-t border-stone-200 space-y-2 animate-fadeIn">
+                        <div className="pt-2 border-t border-stone-200 space-y-2 animate-fadeIn animate-slideDown">
                           <p className="text-stone-600 font-medium">
                             • 吃蛋總數：{hist.totalEggsConsumed} 顆 | 結轉庫存：{hist.remainingEggsCarriedOver} 顆
                           </p>
                           <div className="space-y-1 bg-white p-2.5 rounded-xl border border-stone-200/60">
                             <span className="font-bold text-stone-500 block text-[11px]">各成員分攤情況：</span>
                             {hist.breakdown?.map(b => (
-                              <div key={b.id} className="flex justify-between text-[11px] text-stone-600">
+                              <div key={b.id} className="flex justify-between text-[11px] text-stone-600 animate-fadeIn">
                                 <span>{b.name} (吃 {b.consumed} 顆)</span>
                                 <span>應付 ${b.shouldPay} / 代墊 ${b.paid}</span>
                               </div>
@@ -1555,10 +1565,10 @@ export default function App() {
                           <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200/50">
                             <span className="font-bold text-amber-900 block text-[11px]">轉帳紀錄：</span>
                             {hist.transactions?.length === 0 ? (
-                              <p className="text-[11px] text-emerald-700">該期帳目已完全平衡</p>
+                              <p className="text-[11px] text-emerald-700 animate-fadeIn">該期帳目已完全平衡</p>
                             ) : (
                               hist.transactions?.map((t, tIdx) => (
-                                <p key={tIdx} className="text-[11px] text-stone-700">
+                                <p key={tIdx} className="text-[11px] text-stone-700 animate-fadeIn">
                                   {t.from} ➜ {t.to}：NT$ {t.amount}
                                 </p>
                               ))
